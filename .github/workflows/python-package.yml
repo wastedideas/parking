@@ -1,0 +1,38 @@
+name: Python package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - 3.8
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: pip install -r requirements-ci.txt
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Lint with black
+        run: black --extend-exclude=migrations --diff --check .
+      - name: Lint with isort
+        run: isort --check-only --profile black --extend-skip migrations .
+      - name: Lint with flake8
+        run: flake8 . --max-line-length=120 --exclude=migrations
+      - name: Run tests
+        run: docker-compose -f docker-compose.test.yml up -d && docker-compose -f docker-compose.test.yml run app pytest -vv
